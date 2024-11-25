@@ -110,15 +110,10 @@ impl<'a> State<'a> {
 
     fn update(&mut self) {
         let mut camera = self.camera.borrow_mut();
-        let angle: f32 = 0.007; //0.005f32;
-        camera.facing_dir = Vector2::new(
-            camera.facing_dir.x * angle.cos() - camera.facing_dir.y * angle.sin(),
-            camera.facing_dir.x * angle.sin() + camera.facing_dir.y * angle.cos(),
-        );
-        camera.view_plane = Vector2::new(
-            camera.view_plane.x * angle.cos() - camera.view_plane.y * angle.sin(),
-            camera.view_plane.x * angle.sin() + camera.view_plane.y * angle.cos(),
-        );
+        let angle = Rad(0.007); //0.005f32;
+        let rot: Basis2<f32> = Rotation2::from_angle(angle);
+        camera.facing_dir = rot.rotate_vector(camera.facing_dir);
+        camera.view_plane = rot.rotate_vector(camera.view_plane);
     }
 
     fn render(&mut self) -> std::result::Result<(), wgpu::SurfaceError> {

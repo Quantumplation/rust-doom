@@ -2,8 +2,8 @@ use std::sync::{Arc, Mutex};
 
 use anyhow::{Context, Result};
 use wgpu::{
-    Extent3d, PowerPreference, RequestAdapterOptions, TextureDescriptor, TextureFormat,
-    TextureUsages, TextureViewDescriptor,
+    Extent3d, ImageCopyTexture, ImageDataLayout, Origin3d, PowerPreference, RequestAdapterOptions,
+    TextureDescriptor, TextureFormat, TextureUsages, TextureViewDescriptor,
 };
 use winit::{dpi::PhysicalSize, window::Window};
 
@@ -11,6 +11,7 @@ use crate::{renderer::Renderer, Camera};
 
 pub struct Graphics<'a> {
     surface: wgpu::Surface<'a>,
+    screen: wgpu::Texture,
     device: wgpu::Device,
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
@@ -77,8 +78,8 @@ impl<'a> Graphics<'a> {
         let screen_descriptor = TextureDescriptor {
             label: Some("screen"),
             size: Extent3d {
-                width: 800,
-                height: 600,
+                width: size.width,
+                height: size.height,
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
@@ -173,9 +174,10 @@ impl<'a> Graphics<'a> {
             cache: None,
         });
 
-        let renderer = Renderer::new(camera, Arc::new(screen));
+        let renderer = Renderer::new(camera, size);
         Ok(Self {
             surface,
+            screen,
             device,
             queue,
             config,
@@ -192,9 +194,31 @@ impl<'a> Graphics<'a> {
         self.surface.configure(&self.device, &self.config);
     }
 
+    fn queue(&self) {
+        let (width, height) = (self.config.width, self.config.height);
+        let texture = ImageCopyTexture {
+            texture: &self.screen,
+            mip_level: 0,
+            origin: Origin3d::ZERO,
+            aspect: wgpu::TextureAspect::All,
+        };
+        let size = Extent3d {
+            width,
+            height,
+            depth_or_array_layers: 1,
+        };
+        let data_layout = ImageDataLayout {
+            offset: 0,
+            bytes_per_row: Some(width * 4),
+            rows_per_image: Some(height),
+        };
+        let pixels = self.renderer.pixels();
+        self.queue.write_texture(texture, pixels, data_layout, size);
+    }
+
     pub fn render(&mut self) -> std::result::Result<(), wgpu::SurfaceError> {
         self.renderer.render();
-        self.renderer.queue(&self.queue);
+        self.queue();
 
         let output = self.surface.get_current_texture()?;
         let view = output

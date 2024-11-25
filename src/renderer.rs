@@ -1,10 +1,10 @@
 use std::sync::{Arc, Mutex};
 
-use wgpu::{Extent3d, ImageCopyTexture, ImageDataLayout, Origin3d, Queue};
+use winit::dpi::PhysicalSize;
 
 pub struct Renderer {
     camera: Arc<Mutex<Camera>>,
-    screen: Arc<wgpu::Texture>,
+    size: PhysicalSize<u32>,
     pixels: Vec<u8>,
 }
 
@@ -34,19 +34,20 @@ pub struct Camera {
 }
 
 impl Renderer {
-    pub fn new(camera: Arc<Mutex<Camera>>, screen: Arc<wgpu::Texture>) -> Self {
-        let size = (screen.width() * screen.height() * 4) as usize;
+    pub fn new(camera: Arc<Mutex<Camera>>, size: PhysicalSize<u32>) -> Self {
+        let buffer_size = size.width * size.height * 4;
         Self {
             camera,
-            screen,
-            pixels: vec![0; size],
+            size,
+            pixels: vec![0; buffer_size as usize],
         }
     }
 
     pub fn render(&mut self) {
         let camera = self.camera.lock().unwrap();
-        for x in 0..800 {
-            let xcam = (2. * (x as f32 / 800.)) - 1.;
+        let (width, height) = (self.size.width as usize, self.size.height as usize);
+        for x in 0..width {
+            let xcam = (2. * (x as f32 / width as f32)) - 1.;
             let ray = (
                 camera.facing_dir.0 + camera.view_plane.0 * xcam,
                 camera.facing_dir.1 + camera.view_plane.1 * xcam,
@@ -114,49 +115,32 @@ impl Renderer {
                 _ => side_dist.1 - delta_dist.1,
             };
 
-            let h = (600. / dperp) as u32;
-            let y0 = u32::max(300 - (h / 2), 0) as usize;
-            let y1 = u32::min(300 + (h / 2), 600 - 1) as usize;
+            let h = (height as f32 / dperp) as usize;
+            let y0 = usize::max((height / 2) - (h / 2), 0);
+            let y1 = usize::min((height / 2) + (h / 2), height - 1);
 
             for y in 0..y0 {
-                self.pixels[(y * 800 + x) * 4 + 3] = 0xFF;
-                self.pixels[(y * 800 + x) * 4 + 2] = 0x20;
-                self.pixels[(y * 800 + x) * 4 + 1] = 0x20;
-                self.pixels[(y * 800 + x) * 4 + 0] = 0x20;
+                self.pixels[(y * width + x) * 4 + 3] = 0xFF;
+                self.pixels[(y * width + x) * 4 + 2] = 0x20;
+                self.pixels[(y * width + x) * 4 + 1] = 0x20;
+                self.pixels[(y * width + x) * 4 + 0] = 0x20;
             }
             for y in y0..=y1 {
-                self.pixels[(y * 800 + x) * 4 + 3] = ((color & 0xFF000000) >> 24) as u8;
-                self.pixels[(y * 800 + x) * 4 + 2] = ((color & 0x00FF0000) >> 16) as u8;
-                self.pixels[(y * 800 + x) * 4 + 1] = ((color & 0x0000FF00) >> 8) as u8;
-                self.pixels[(y * 800 + x) * 4 + 0] = (color & 0x000000FF) as u8;
+                self.pixels[(y * width + x) * 4 + 3] = ((color & 0xFF000000) >> 24) as u8;
+                self.pixels[(y * width + x) * 4 + 2] = ((color & 0x00FF0000) >> 16) as u8;
+                self.pixels[(y * width + x) * 4 + 1] = ((color & 0x0000FF00) >> 8) as u8;
+                self.pixels[(y * width + x) * 4 + 0] = (color & 0x000000FF) as u8;
             }
-            for y in y1..600 {
-                self.pixels[(y * 800 + x) * 4 + 3] = 0xFF;
-                self.pixels[(y * 800 + x) * 4 + 2] = 0x40;
-                self.pixels[(y * 800 + x) * 4 + 1] = 0x40;
-                self.pixels[(y * 800 + x) * 4 + 0] = 0x40;
+            for y in y1..height {
+                self.pixels[(y * width + x) * 4 + 3] = 0xFF;
+                self.pixels[(y * width + x) * 4 + 2] = 0x40;
+                self.pixels[(y * width + x) * 4 + 1] = 0x40;
+                self.pixels[(y * width + x) * 4 + 0] = 0x40;
             }
         }
     }
 
-    pub fn queue(&self, queue: &Queue) {
-        let (width, height) = (self.screen.width(), self.screen.height());
-        let texture = ImageCopyTexture {
-            texture: &self.screen,
-            mip_level: 0,
-            origin: Origin3d::ZERO,
-            aspect: wgpu::TextureAspect::All,
-        };
-        let size = Extent3d {
-            width,
-            height,
-            depth_or_array_layers: 1,
-        };
-        let data_layout = ImageDataLayout {
-            offset: 0,
-            bytes_per_row: Some(800 * 4),
-            rows_per_image: Some(600),
-        };
-        queue.write_texture(texture, &self.pixels, data_layout, size);
+    pub fn pixels(&self) -> &[u8] {
+        &self.pixels
     }
 }

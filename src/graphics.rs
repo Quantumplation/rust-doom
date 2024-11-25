@@ -1,9 +1,4 @@
-use std::{
-    cell::RefCell,
-    rc::Rc,
-    sync::{Arc, Mutex},
-    time::Instant,
-};
+use std::{cell::RefCell, rc::Rc, time::Instant};
 
 use anyhow::{Context, Result};
 use wgpu::{

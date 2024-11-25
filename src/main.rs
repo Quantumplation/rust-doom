@@ -1,11 +1,7 @@
 pub mod graphics;
 pub mod renderer;
 
-use std::{
-    cell::RefCell,
-    rc::Rc,
-    sync::{Arc, Mutex},
-};
+use std::{cell::RefCell, rc::Rc};
 
 use anyhow::{Context, Result};
 use graphics::Graphics;

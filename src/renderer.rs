@@ -1,8 +1,9 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use wgpu::{Extent3d, ImageCopyTexture, ImageDataLayout, Origin3d, Queue};
 
 pub struct Renderer {
+    camera: Arc<Mutex<Camera>>,
     screen: Arc<wgpu::Texture>,
     pixels: Vec<u8>,
 }
@@ -26,28 +27,31 @@ const MAP_DATA: [u8; 15*15] = [
     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
 ];
 
+pub struct Camera {
+    pub player_pos: (f32, f32),
+    pub facing_dir: (f32, f32),
+    pub view_plane: (f32, f32),
+}
+
 impl Renderer {
-    pub fn new(screen: Arc<wgpu::Texture>) -> Self {
+    pub fn new(camera: Arc<Mutex<Camera>>, screen: Arc<wgpu::Texture>) -> Self {
         let size = (screen.width() * screen.height() * 4) as usize;
         Self {
+            camera,
             screen,
             pixels: vec![0; size],
         }
     }
 
-    pub fn render(
-        &mut self,
-        player_pos: (f32, f32),
-        facing_dir: (f32, f32),
-        view_plane: (f32, f32),
-    ) {
+    pub fn render(&mut self) {
+        let camera = self.camera.lock().unwrap();
         for x in 0..800 {
             let xcam = (2. * (x as f32 / 800.)) - 1.;
             let ray = (
-                facing_dir.0 + view_plane.0 * xcam,
-                facing_dir.1 + view_plane.1 * xcam,
+                camera.facing_dir.0 + camera.view_plane.0 * xcam,
+                camera.facing_dir.1 + camera.view_plane.1 * xcam,
             );
-            let pos = player_pos;
+            let pos = camera.player_pos;
             let mut ipos = (pos.0 as usize, pos.1 as usize);
             let delta_dist = (
                 if ray.0.abs() < 1e-20 {

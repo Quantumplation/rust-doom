@@ -4,6 +4,7 @@ pub mod renderer;
 use std::{cell::RefCell, rc::Rc};
 
 use anyhow::{Context, Result};
+use cgmath::{prelude::*, Basis2, Rad, Vector2};
 use graphics::Graphics;
 use renderer::Camera;
 use winit::{
@@ -26,9 +27,9 @@ impl<'a> State<'a> {
     async fn new(window: &'a Window) -> Result<State<'a>> {
         let size = window.inner_size();
         let camera = Rc::new(RefCell::new(Camera {
-            player_pos: (5., 5.),
-            facing_dir: (-1., 0.1),
-            view_plane: (0., 0.66),
+            player_pos: Vector2::new(5., 5.),
+            facing_dir: Vector2::new(-1., 0.1),
+            view_plane: Vector2::new(0., 0.66),
         }));
         let graphics = Graphics::new(camera.clone(), window, size)
             .await
@@ -110,13 +111,13 @@ impl<'a> State<'a> {
     fn update(&mut self) {
         let mut camera = self.camera.borrow_mut();
         let angle: f32 = 0.007; //0.005f32;
-        camera.facing_dir = (
-            camera.facing_dir.0 * angle.cos() - camera.facing_dir.1 * angle.sin(),
-            camera.facing_dir.0 * angle.sin() + camera.facing_dir.1 * angle.cos(),
+        camera.facing_dir = Vector2::new(
+            camera.facing_dir.x * angle.cos() - camera.facing_dir.y * angle.sin(),
+            camera.facing_dir.x * angle.sin() + camera.facing_dir.y * angle.cos(),
         );
-        camera.view_plane = (
-            camera.view_plane.0 * angle.cos() - camera.view_plane.1 * angle.sin(),
-            camera.view_plane.0 * angle.sin() + camera.view_plane.1 * angle.cos(),
+        camera.view_plane = Vector2::new(
+            camera.view_plane.x * angle.cos() - camera.view_plane.y * angle.sin(),
+            camera.view_plane.x * angle.sin() + camera.view_plane.y * angle.cos(),
         );
     }
 

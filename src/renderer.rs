@@ -1,5 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
+use cgmath::{ElementWise, Vector2, Zero};
 use winit::dpi::PhysicalSize;
 
 pub struct Renderer {
@@ -28,18 +29,26 @@ const MAP_DATA: [u8; 15*15] = [
 ];
 
 pub struct Camera {
-    pub player_pos: (f32, f32),
-    pub facing_dir: (f32, f32),
-    pub view_plane: (f32, f32),
+    pub player_pos: Vector2<f32>,
+    pub facing_dir: Vector2<f32>,
+    pub view_plane: Vector2<f32>,
 }
 
-#[derive(Default)]
 pub struct Hit {
     material: u8,
     side: u8,
-    x: f32,
-    y: f32,
+    point: Vector2<f32>,
     dist: f32,
+}
+impl Default for Hit {
+    fn default() -> Self {
+        Hit {
+            material: 0,
+            side: 0,
+            point: Vector2::zero(),
+            dist: 0.,
+        }
+    }
 }
 
 impl Renderer {
@@ -61,50 +70,49 @@ impl Renderer {
     fn raycast(&self, x: usize) -> Hit {
         let camera = self.camera.borrow();
         let xcam = (2. * (x as f32 / self.size.width as f32)) - 1.;
-        let ray = (
-            camera.facing_dir.0 + camera.view_plane.0 * xcam,
-            camera.facing_dir.1 + camera.view_plane.1 * xcam,
+        let ray = Vector2::new(
+            camera.facing_dir.x + camera.view_plane.x * xcam,
+            camera.facing_dir.y + camera.view_plane.y * xcam,
         );
 
         let pos = camera.player_pos;
-        let mut ipos = (pos.0 as usize, pos.1 as usize);
-        let delta_dist = (ray.0.recip().abs(), ray.1.recip().abs());
-        let mut side_dist = (
-            if ray.0.abs() < 1e-20 {
-                pos.0 - ipos.0 as f32
+        let mut ipos = Vector2::new(pos.x as usize, pos.y as usize);
+        let delta_dist = Vector2::new(ray.x.recip().abs(), ray.y.recip().abs());
+        let mut side_dist = Vector2::new(
+            if ray.x.abs() < 1e-20 {
+                pos.x - ipos.x as f32
             } else {
-                ipos.0 as f32 + 1. - pos.0
+                ipos.x as f32 + 1. - pos.x
             },
-            if ray.1.abs() < 1e-20 {
-                pos.1 - ipos.1 as f32
+            if ray.y.abs() < 1e-20 {
+                pos.y - ipos.y as f32
             } else {
-                ipos.1 as f32 + 1. - pos.1
+                ipos.y as f32 + 1. - pos.y
             },
         );
 
-        let step = (ray.0.signum() as i32, ray.1.signum() as i32);
+        let step = Vector2::new(ray.x.signum() as i32, ray.y.signum() as i32);
 
         let mut hit = Hit::default();
 
         while hit.material == 0 {
-            if side_dist.0 < side_dist.1 {
-                side_dist.0 += delta_dist.0;
-                ipos.0 = (ipos.0 as i32 + step.0) as usize;
+            if side_dist.x < side_dist.y {
+                side_dist.x += delta_dist.x;
+                ipos.x = (ipos.x as i32 + step.x) as usize;
                 hit.side = 0;
             } else {
-                side_dist.1 += delta_dist.1;
-                ipos.1 = (ipos.1 as i32 + step.1) as usize;
+                side_dist.y += delta_dist.y;
+                ipos.y = (ipos.y as i32 + step.y) as usize;
                 hit.side = 1;
             }
 
-            hit.material = MAP_DATA[ipos.1 * 15 + ipos.0];
+            hit.material = MAP_DATA[ipos.y * 15 + ipos.x];
         }
 
-        hit.x = pos.0 + side_dist.0;
-        hit.y = pos.1 + side_dist.1;
+        hit.point = pos.add_element_wise(side_dist);
         hit.dist = match hit.side {
-            0 => side_dist.0 - delta_dist.0,
-            _ => side_dist.1 - delta_dist.1,
+            0 => side_dist.x - delta_dist.x,
+            _ => side_dist.y - delta_dist.y,
         };
 
         hit

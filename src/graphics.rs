@@ -1,4 +1,9 @@
-use std::sync::{Arc, Mutex};
+use std::{
+    cell::RefCell,
+    rc::Rc,
+    sync::{Arc, Mutex},
+    time::Instant,
+};
 
 use anyhow::{Context, Result};
 use wgpu::{
@@ -19,11 +24,12 @@ pub struct Graphics<'a> {
     bind_group: wgpu::BindGroup,
 
     renderer: Renderer,
+    last_frame: std::time::Instant,
 }
 
 impl<'a> Graphics<'a> {
     pub async fn new(
-        camera: Arc<Mutex<Camera>>,
+        camera: Rc<RefCell<Camera>>,
         window: &'a Window,
         size: PhysicalSize<u32>,
     ) -> Result<Self> {
@@ -185,6 +191,7 @@ impl<'a> Graphics<'a> {
             render_pipeline,
 
             renderer,
+            last_frame: Instant::now(),
         })
     }
 
@@ -259,6 +266,10 @@ impl<'a> Graphics<'a> {
 
         self.queue.submit(std::iter::once(encoder.finish()));
         output.present();
+
+        let duration = self.last_frame.elapsed();
+        println!("FPS: {}", 1000000000. / (duration.as_nanos() as f64));
+        self.last_frame = Instant::now();
         Ok(())
     }
 }

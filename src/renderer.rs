@@ -1,11 +1,15 @@
-use std::sync::{Arc, Mutex};
+use std::{
+    cell::RefCell,
+    rc::Rc,
+    sync::{Arc, Mutex},
+};
 
 use winit::dpi::PhysicalSize;
 
 pub struct Renderer {
-    camera: Arc<Mutex<Camera>>,
+    camera: Rc<RefCell<Camera>>,
     size: PhysicalSize<u32>,
-    pixels: Vec<u8>,
+    pixels: Vec<u32>,
 }
 
 #[rustfmt::skip]
@@ -34,8 +38,8 @@ pub struct Camera {
 }
 
 impl Renderer {
-    pub fn new(camera: Arc<Mutex<Camera>>, size: PhysicalSize<u32>) -> Self {
-        let buffer_size = size.width * size.height * 4;
+    pub fn new(camera: Rc<RefCell<Camera>>, size: PhysicalSize<u32>) -> Self {
+        let buffer_size = size.width * size.height;
         Self {
             camera,
             size,
@@ -44,7 +48,7 @@ impl Renderer {
     }
 
     pub fn render(&mut self) {
-        let camera = self.camera.lock().unwrap();
+        let camera = self.camera.borrow();
         let (width, height) = (self.size.width as usize, self.size.height as usize);
         for x in 0..width {
             let xcam = (2. * (x as f32 / width as f32)) - 1.;
@@ -52,6 +56,7 @@ impl Renderer {
                 camera.facing_dir.0 + camera.view_plane.0 * xcam,
                 camera.facing_dir.1 + camera.view_plane.1 * xcam,
             );
+
             let pos = camera.player_pos;
             let mut ipos = (pos.0 as usize, pos.1 as usize);
             let delta_dist = (
@@ -120,27 +125,18 @@ impl Renderer {
             let y1 = usize::min((height / 2) + (h / 2), height - 1);
 
             for y in 0..y0 {
-                self.pixels[(y * width + x) * 4 + 3] = 0xFF;
-                self.pixels[(y * width + x) * 4 + 2] = 0x20;
-                self.pixels[(y * width + x) * 4 + 1] = 0x20;
-                self.pixels[(y * width + x) * 4 + 0] = 0x20;
+                self.pixels[y * width + x] = 0xFF202020;
             }
             for y in y0..=y1 {
-                self.pixels[(y * width + x) * 4 + 3] = ((color & 0xFF000000) >> 24) as u8;
-                self.pixels[(y * width + x) * 4 + 2] = ((color & 0x00FF0000) >> 16) as u8;
-                self.pixels[(y * width + x) * 4 + 1] = ((color & 0x0000FF00) >> 8) as u8;
-                self.pixels[(y * width + x) * 4 + 0] = (color & 0x000000FF) as u8;
+                self.pixels[y * width + x] = color;
             }
             for y in y1..height {
-                self.pixels[(y * width + x) * 4 + 3] = 0xFF;
-                self.pixels[(y * width + x) * 4 + 2] = 0x40;
-                self.pixels[(y * width + x) * 4 + 1] = 0x40;
-                self.pixels[(y * width + x) * 4 + 0] = 0x40;
+                self.pixels[y * width + x] = 0xFF404040;
             }
         }
     }
 
     pub fn pixels(&self) -> &[u8] {
-        &self.pixels
+        bytemuck::cast_slice::<u32, u8>(&self.pixels)
     }
 }

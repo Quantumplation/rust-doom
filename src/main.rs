@@ -1,7 +1,11 @@
 pub mod graphics;
 pub mod renderer;
 
-use std::sync::{Arc, Mutex};
+use std::{
+    cell::RefCell,
+    rc::Rc,
+    sync::{Arc, Mutex},
+};
 
 use anyhow::{Context, Result};
 use graphics::Graphics;
@@ -18,14 +22,14 @@ struct State<'a> {
     window: &'a Window,
 
     graphics: graphics::Graphics<'a>,
-    camera: Arc<Mutex<Camera>>,
+    camera: Rc<RefCell<Camera>>,
 }
 
 impl<'a> State<'a> {
     // Creating some of the wgpu types requires async code
     async fn new(window: &'a Window) -> Result<State<'a>> {
         let size = window.inner_size();
-        let camera = Arc::new(Mutex::new(Camera {
+        let camera = Rc::new(RefCell::new(Camera {
             player_pos: (5., 5.),
             facing_dir: (-1., 0.1),
             view_plane: (0., 0.66),
@@ -108,7 +112,7 @@ impl<'a> State<'a> {
     }
 
     fn update(&mut self) {
-        let mut camera = self.camera.lock().unwrap();
+        let mut camera = self.camera.borrow_mut();
         let angle: f32 = 0.007; //0.005f32;
         camera.facing_dir = (
             camera.facing_dir.0 * angle.cos() - camera.facing_dir.1 * angle.sin(),
